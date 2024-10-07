@@ -1,66 +1,33 @@
 import os
-import sys
-import requests
 import json
+import requests
 
-# Capture environment variables
-PR_AUTHOR = os.getenv('PR_AUTHOR')
-REPO = os.getenv('REPO')
-COMMIT = os.getenv('COMMIT')
-MESSAGE = os.getenv('MESSAGE')
-STATUS = os.getenv('STATUS')
-WORKFLOW = os.getenv('WORKFLOW')
-JOB_NAME = os.getenv('JOB_NAME')
+# Retrieve environment variables
+slack_mapping = json.loads(os.getenv('SLACK_MAPPING'))
+slack_oauth_token = os.getenv('SLACK_OAUTH_TOKEN')
+pr_author = os.getenv('PR_AUTHOR')
+repo = os.getenv('REPO')
+commit = os.getenv('COMMIT')
+message = os.getenv('MESSAGE')
+status = os.getenv('STATUS')
+workflow = os.getenv('WORKFLOW')
+job_name = os.getenv('JOB_NAME')
 
-# Get Slack mapping and token from environment (GitHub secrets)
-SLACK_MAPPING = os.getenv('SLACK_MAPPING')
-SLACK_OAUTH_TOKEN = os.getenv('SLACK_OAUTH_TOKEN')
+# Prepare the Slack message
+slack_user = slack_mapping.get(pr_author, pr_author)  # Fallback to the PR author if not mapped
+slack_message = f"Notification from {repo}: {pr_author} has a commit ({commit}) with message: {message}. Status: {status} in {workflow} for job {job_name}"
 
-# Debugging information
-print("Start Slack notification debug...")
-print(f"PR Author: {PR_AUTHOR}")
-print(f"Repository: {REPO}")
-print(f"Commit SHA: {COMMIT}")
-print(f"Commit Message: {MESSAGE}")
-print(f"Build Status: {STATUS}")
-print(f"Workflow: {WORKFLOW}")
-print(f"Job Name: {JOB_NAME}")
+# Send the message to Slack
+headers = {
+    'Authorization': f'Bearer {slack_oauth_token}',
+    'Content-Type': 'application/json'
+}
+payload = {
+    'channel': slack_user,
+    'text': slack_message
+}
 
-# Get the Slack user ID from the mapping
-slack_mapping = json.loads(SLACK_MAPPING)
-slack_author = slack_mapping.get(PR_AUTHOR)
+response = requests.post('https://slack.com/api/chat.postMessage', headers=headers, json=payload)
 
-if not slack_author:
-    print(f"Slack mapping not found for {PR_AUTHOR}; exiting")
-    sys.exit(1)
-
-# Create the message with additional fields
-slack_message = f"""
-Build Status: *{STATUS}*
-Repository: *{REPO}*
-Commit: *{COMMIT}*
-Message: *{MESSAGE}*
-Author: *{PR_AUTHOR}*
-Workflow: *{WORKFLOW}*
-Job: *{JOB_NAME}*
-"""
-
-print(f"Sending Slack notification to: @{slack_author}")
-
-response = requests.post(
-    "https://slack.com/api/chat.postMessage",
-    headers={
-        "Authorization": f"Bearer {SLACK_OAUTH_TOKEN}",
-        "Content-type": "application/json"
-    },
-    json={
-        "channel": f"@{slack_author}",
-        "text": slack_message
-    }
-)
-
-if response.status_code == 200 and response.json().get('ok'):
-    print("Slack notification sent successfully!")
-else:
-    print(f"Failed to send Slack notification. Response: {response.text}")
-    sys.exit(1)
+if response.status_code != 200 or not response.json().get('ok'):
+    raise Exception(f"Request to Slack API failed: {response.text}")
