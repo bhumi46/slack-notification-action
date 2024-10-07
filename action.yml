@@ -1,0 +1,36 @@
+name: 'Slack Notification Action'
+description: 'A GitHub Action to send Slack notifications about PR builds'
+author: 'Your Name'
+
+inputs:
+  # No inputs as we are using GitHub event context and secrets
+
+secrets:
+  slack_mapping:
+    description: 'JSON Slack mapping of PR author to Slack user'
+  slack_oauth_token:
+    description: 'Slack OAuth token'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+    REPO: ${{ github.repository }}
+    COMMIT: ${{ github.sha }}
+    MESSAGE: ${{ github.event.head_commit.message }}
+    STATUS: ${{ job.status }}
+    WORKFLOW: ${{ github.workflow }}
+    JOB_NAME: ${{ github.job }}
+    SLACK_MAPPING: ${{ secrets.slack_mapping }}
+    SLACK_OAUTH_TOKEN: ${{ secrets.slack_oauth_token }}
+  args:
+    - ${{ env.PR_AUTHOR }}
+    - ${{ env.REPO }}
+    - ${{ env.COMMIT }}
+    - ${{ env.MESSAGE }}
+    - ${{ env.STATUS }}
+    - ${{ env.WORKFLOW }}
+    - ${{ env.JOB_NAME }}
+    - ${{ secrets.slack_mapping }}
+    - ${{ secrets.slack_oauth_token }}
